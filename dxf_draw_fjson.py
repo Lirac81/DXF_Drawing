@@ -8,7 +8,7 @@ with open("drawing.json", "r", encoding="utf-8") as f:
     data = json.load(f)
 
 # DXFバージョン指定
-doc = ezdxf.new("R12", setup=True)
+doc = ezdxf.new("R2007", setup=True)
 
 msp = doc.modelspace()
 
