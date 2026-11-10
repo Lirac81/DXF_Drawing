@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DXF → TIFF / PNG 変換サンプル（分割版）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!--
+  HTML：画面に表示する部品（入力欄、ボタン、プレビュー用canvas）を配置する。
+  JavaScriptは、この中のidを目印に部品を取得して動作を割り当てる。
+-->
+<main>
+  <h1>DXF → TIFF / PNG 変換サンプル（分割版）</h1>
+  <p class="lead">DXFを読み込み、原点 (0,0) からA判用紙サイズ分を切り出して画像化します。</p>
+  <div class="layout">
+    <section class="panel">
+      <h2>入力・出力設定</h2>
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="DXFファイルを選択">
+        <strong>DXFファイルをドラッグ＆ドロップ</strong>
+        <small>またはクリックしてファイルを選択</small>
+      </div>
+      <input id="file" type="file" accept=".dxf,application/dxf,text/plain">
+      <div class="field">
+        <div><label for="paper">用紙サイズ</label><select id="paper">
+          <option value="1189,841">A0</option><option value="841,594">A1</option>
+          <option value="594,420">A2</option><option value="420,297" selected>A3</option>
+          <option value="297,210">A4</option>
+        </select></div>
+        <div><label for="orientation">向き</label><select id="orientation">
+          <option value="landscape" selected>横</option><option value="portrait">縦</option>
+        </select></div>
+        <div><label for="dpi">解像度</label><select id="dpi">
+          <option>150</option><option selected>300</option><option>600</option>
+        </select></div>
+        <div><label for="format">出力形式</label><select id="format">
+          <option value="tiff" selected>TIFF（非圧縮RGB）</option><option value="png">PNG</option>
+        </select></div>
+      </div>
+      <button id="render" class="primary" disabled>プレビュー更新</button>
+      <div class="actions">
+        <button id="download" class="secondary" disabled>画像を保存</button>
+        <button id="fit" class="secondary" disabled>プレビュー再表示</button>
+      </div>
+      <div id="status" class="status">DXFファイルを読み込んでください。</div>
+      <div class="note">
+        <b>切り出し範囲</b><br>
+        X = 0 ～ 用紙幅、Y = 0 ～ 用紙高さ（mm）。用紙外の図形は出力しません。図枠の内側余白はそのまま残ります。
+      </div>
+      <div class="note">
+        <b>サンプル版の制限</b><br>
+        dxf-parserで解析できる図形を描画します。DIMENSION・INSERT・HATCH・特殊線種などは、DXFの構成によって表示が不完全な場合があります。寸法値や印刷スタイルの完全再現を保証するものではありません。
+      </div>
+    </section>
+    <section class="panel">
+      <div class="preview-head">
+        <h2>切り出しプレビュー</h2>
+        <span id="previewMeta" class="meta">未読込</span>
+      </div>
+      <div class="canvas-wrap"><canvas id="preview" width="900" height="636"></canvas></div>
+      <p class="footer">プレビューは画面表示用の縮小画像です。保存画像は選択したDPIに応じたピクセル数で生成します。</p>
+    </section>
+  </div>
+</main>
+
+<!--
+  dxf-parser：DXFファイルを読み取り、図形の種類や座標をJavaScriptから扱える形にする外部ライブラリ。
+  CDNから読み込むため、このHTMLを使うときはインターネット接続が必要。
+-->
+<script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js" defer></script>
+<script src="script.js" defer></script>
+</body>
+</html>

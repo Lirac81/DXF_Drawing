@@ -1,0 +1,39 @@
+/* style.css：画面の見た目を定義します。詳細は各ルールのまとまりごとにコメントしています。 */
+/*
+  CSS：画面の見た目を定義する部分。
+  - 左側：DXFの読み込み、用紙・解像度・形式の設定
+  - 右側：切り出し結果のプレビュー
+  - @media：画面幅が狭いときは左右2列から上下1列へ変更
+*/
+:root { color-scheme: light; --ink:#20252b; --muted:#66717d; --line:#d8dee5; --panel:#f5f7f9; --accent:#246bce; }
+* { box-sizing:border-box; }
+body { margin:0; background:#eef1f4; color:var(--ink); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+main { max-width:1180px; margin:28px auto; padding:0 18px 36px; }
+h1 { font-size:23px; margin:0 0 5px; }
+.lead { color:var(--muted); margin:0 0 20px; }
+.layout { display:grid; grid-template-columns:310px minmax(0,1fr); gap:16px; align-items:start; }
+.panel { background:white; border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:0 2px 8px #17212b0a; }
+.panel h2 { font-size:15px; margin:0 0 12px; }
+.drop { border:2px dashed #9aa8b7; background:#fafbfd; border-radius:10px; padding:24px 12px; text-align:center; cursor:pointer; transition:.15s; }
+.drop.over { border-color:var(--accent); background:#edf5ff; }
+.drop strong { display:block; font-size:15px; }
+.drop small { color:var(--muted); }
+input[type=file] { display:none; }
+.field { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:13px; }
+label { display:block; color:#46515d; font-size:12px; margin-bottom:5px; }
+select,button { font:inherit; }
+select { width:100%; padding:8px; border:1px solid var(--line); border-radius:7px; background:white; }
+button { border:0; border-radius:8px; padding:10px 13px; cursor:pointer; font-weight:650; }
+button.primary { background:var(--accent); color:white; width:100%; margin-top:15px; }
+button.secondary { background:#e9eef4; color:#273442; }
+button:disabled { opacity:.45; cursor:not-allowed; }
+.actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:9px; }
+.status { color:var(--muted); font-size:12px; margin-top:11px; min-height:36px; overflow-wrap:anywhere; }
+.note { background:#fff8e7; border:1px solid #f0dfb5; padding:10px 11px; border-radius:8px; color:#665322; font-size:12px; margin-top:14px; }
+.preview-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+.preview-head h2 { margin:0; }
+.meta { color:var(--muted); font-size:12px; }
+.canvas-wrap { background:#dfe4e9; border-radius:9px; min-height:520px; display:flex; align-items:center; justify-content:center; padding:16px; overflow:auto; }
+canvas { background:white; max-width:100%; max-height:72vh; width:auto; height:auto; box-shadow:0 2px 12px #17212b24; }
+.footer { color:var(--muted); font-size:12px; margin-top:13px; }
+@media(max-width:800px){ .layout{grid-template-columns:1fr;} .canvas-wrap{min-height:350px;} }
