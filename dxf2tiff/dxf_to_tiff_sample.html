@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DXF → TIFF / PNG 変換サンプル</title>
+<style>
+:root { color-scheme: light; --ink:#20252b; --muted:#66717d; --line:#d8dee5; --panel:#f5f7f9; --accent:#246bce; }
+* { box-sizing:border-box; }
+body { margin:0; background:#eef1f4; color:var(--ink); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+main { max-width:1180px; margin:28px auto; padding:0 18px 36px; }
+h1 { font-size:23px; margin:0 0 5px; }
+.lead { color:var(--muted); margin:0 0 20px; }
+.layout { display:grid; grid-template-columns:310px minmax(0,1fr); gap:16px; align-items:start; }
+.panel { background:white; border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:0 2px 8px #17212b0a; }
+.panel h2 { font-size:15px; margin:0 0 12px; }
+.drop { border:2px dashed #9aa8b7; background:#fafbfd; border-radius:10px; padding:24px 12px; text-align:center; cursor:pointer; transition:.15s; }
+.drop.over { border-color:var(--accent); background:#edf5ff; }
+.drop strong { display:block; font-size:15px; }
+.drop small { color:var(--muted); }
+input[type=file] { display:none; }
+.field { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:13px; }
+label { display:block; color:#46515d; font-size:12px; margin-bottom:5px; }
+select,button { font:inherit; }
+select { width:100%; padding:8px; border:1px solid var(--line); border-radius:7px; background:white; }
+button { border:0; border-radius:8px; padding:10px 13px; cursor:pointer; font-weight:650; }
+button.primary { background:var(--accent); color:white; width:100%; margin-top:15px; }
+button.secondary { background:#e9eef4; color:#273442; }
+button:disabled { opacity:.45; cursor:not-allowed; }
+.actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:9px; }
+.status { color:var(--muted); font-size:12px; margin-top:11px; min-height:36px; overflow-wrap:anywhere; }
+.note { background:#fff8e7; border:1px solid #f0dfb5; padding:10px 11px; border-radius:8px; color:#665322; font-size:12px; margin-top:14px; }
+.preview-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+.preview-head h2 { margin:0; }
+.meta { color:var(--muted); font-size:12px; }
+.canvas-wrap { background:#dfe4e9; border-radius:9px; min-height:520px; display:flex; align-items:center; justify-content:center; padding:16px; overflow:auto; }
+canvas { background:white; max-width:100%; max-height:72vh; width:auto; height:auto; box-shadow:0 2px 12px #17212b24; }
+.footer { color:var(--muted); font-size:12px; margin-top:13px; }
+@media(max-width:800px){ .layout{grid-template-columns:1fr;} .canvas-wrap{min-height:350px;} }
+</style>
+</head>
+<body>
+<main>
+  <h1>DXF → TIFF / PNG 変換サンプル</h1>
+  <p class="lead">DXFを読み込み、原点 (0,0) からA判用紙サイズ分を切り出して画像化します。</p>
+  <div class="layout">
+    <section class="panel">
+      <h2>入力・出力設定</h2>
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="DXFファイルを選択">
+        <strong>DXFファイルをドラッグ＆ドロップ</strong>
+        <small>またはクリックしてファイルを選択</small>
+      </div>
+      <input id="file" type="file" accept=".dxf,application/dxf,text/plain">
+      <div class="field">
+        <div><label for="paper">用紙サイズ</label><select id="paper">
+          <option value="1189,841">A0</option><option value="841,594">A1</option>
+          <option value="594,420">A2</option><option value="420,297" selected>A3</option>
+          <option value="297,210">A4</option>
+        </select></div>
+        <div><label for="orientation">向き</label><select id="orientation">
+          <option value="landscape" selected>横</option><option value="portrait">縦</option>
+        </select></div>
+        <div><label for="dpi">解像度</label><select id="dpi">
+          <option>150</option><option selected>300</option><option>600</option>
+        </select></div>
+        <div><label for="format">出力形式</label><select id="format">
+          <option value="tiff" selected>TIFF（非圧縮RGB）</option><option value="png">PNG</option>
+        </select></div>
+      </div>
+      <button id="render" class="primary" disabled>プレビュー更新</button>
+      <div class="actions">
+        <button id="download" class="secondary" disabled>画像を保存</button>
+        <button id="fit" class="secondary" disabled>プレビュー再表示</button>
+      </div>
+      <div id="status" class="status">DXFファイルを読み込んでください。</div>
+      <div class="note">
+        <b>切り出し範囲</b><br>
+        X = 0 ～ 用紙幅、Y = 0 ～ 用紙高さ（mm）。用紙外の図形は出力しません。図枠の内側余白はそのまま残ります。
+      </div>
+      <div class="note">
+        <b>サンプル版の制限</b><br>
+        dxf-parserで解析できる図形を描画します。DIMENSION・INSERT・HATCH・特殊線種などは、DXFの構成によって表示が不完全な場合があります。寸法値や印刷スタイルの完全再現を保証するものではありません。
+      </div>
+    </section>
+    <section class="panel">
+      <div class="preview-head">
+        <h2>切り出しプレビュー</h2>
+        <span id="previewMeta" class="meta">未読込</span>
+      </div>
+      <div class="canvas-wrap"><canvas id="preview" width="900" height="636"></canvas></div>
+      <p class="footer">プレビューは画面表示用の縮小画像です。保存画像は選択したDPIに応じたピクセル数で生成します。</p>
+    </section>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const drop = $("drop"), fileInput = $("file"), preview = $("preview");
+  const pctx = preview.getContext("2d");
+  let parsed = null, filename = "drawing", lastBlob = null;
+
+  function say(message) { $("status").textContent = message; }
+  function paperSize() {
+    let [w,h] = $("paper").value.split(",").map(Number);
+    if ($("orientation").value === "portrait") [w,h] = [h,w];
+    return {w,h};
+  }
+  function setPreviewMeta(w,h,dpi) {
+    $("previewMeta").textContent = `${w} × ${h} mm ・ ${dpi} dpi`;
+  }
+  function layerColor(entity) {
+    // ACI色番号の基本色を近似。BYLAYER(256)・BYBLOCK(0)は黒扱い。
+    const colors = {1:"#ff0000",2:"#ffff00",3:"#00aa00",4:"#00aaaa",5:"#0000ff",6:"#aa00aa",7:"#111111",8:"#777777",9:"#aaaaaa"};
+    return colors[entity.color] || "#111111";
+  }
+  function drawEntity(ctx, e, tr) {
+    const p = (x,y) => [tr.x + x*tr.s, tr.y + (tr.h-y)*tr.s];
+    const lineWidth = Math.max(0.7, tr.s * 0.18);
+    ctx.strokeStyle = layerColor(e); ctx.fillStyle = ctx.strokeStyle;
+    ctx.lineWidth = lineWidth; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const type = String(e.type || "").toUpperCase();
+    ctx.beginPath();
+    if (type === "LINE") {
+      const a=p(e.vertices?.[0]?.x ?? e.start?.x, e.vertices?.[0]?.y ?? e.start?.y);
+      const b=p(e.vertices?.[1]?.x ?? e.end?.x, e.vertices?.[1]?.y ?? e.end?.y);
+      if (a.some(Number.isNaN)||b.some(Number.isNaN)) return;
+      ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
+    } else if (type === "CIRCLE") {
+      const c=e.center; if(!c) return;
+      const q=p(c.x,c.y); ctx.arc(q[0],q[1],Math.abs(e.radius*tr.s),0,Math.PI*2); ctx.stroke();
+    } else if (type === "ARC") {
+      const c=e.center; if(!c) return;
+      const q=p(c.x,c.y), a0=(e.startAngle||0), a1=(e.endAngle||0);
+      // DXF角度は反時計回り。CanvasはY反転済みなので符号を反転する。
+      ctx.arc(q[0],q[1],Math.abs(e.radius*tr.s),-a0,-a1,true); ctx.stroke();
+    } else if (type === "LWPOLYLINE" || type === "POLYLINE") {
+      const verts=e.vertices || []; if(verts.length<2) return;
+      verts.forEach((v,i)=>{ const q=p(v.x,v.y); if(i===0)ctx.moveTo(...q); else ctx.lineTo(...q); });
+      if(e.shape || e.closed) ctx.closePath();
+      ctx.stroke();
+    } else if (type === "POINT") {
+      const q=p(e.position?.x,e.position?.y); ctx.fillRect(q[0]-2,q[1]-2,4,4);
+    } else if (type === "TEXT" || type === "MTEXT") {
+      const pos=e.startPoint || e.position || e.insertionPoint; if(!pos) return;
+      const q=p(pos.x,pos.y);
+      const h=Math.max(5,(e.textHeight || e.height || 2.5)*tr.s);
+      ctx.save(); ctx.translate(q[0],q[1]); ctx.scale(1,-1);
+      ctx.font=`${h}px sans-serif`; ctx.fillText(String(e.text||"").replace(/\\P/g,"\n"),0,0); ctx.restore();
+    } else if (type === "SOLID" || type === "3DFACE") {
+      const verts=e.vertices||[]; if(verts.length<3)return;
+      verts.forEach((v,i)=>{const q=p(v.x,v.y);if(i===0)ctx.moveTo(...q);else ctx.lineTo(...q);});
+      ctx.closePath();ctx.stroke();
+    }
+    // その他のエンティティはこのサンプルではスキップ。
+  }
+  function renderToCanvas(canvas, maxPixels, forPreview=false) {
+    if(!parsed) throw new Error("DXFが読み込まれていません。");
+    const {w,h}=paperSize();
+    let dpi=Number($("dpi").value);
+    let pxW=Math.round(w/25.4*dpi), pxH=Math.round(h/25.4*dpi);
+    if(forPreview) {
+      const scale=Math.min(1100/pxW,760/pxH,1);
+      pxW=Math.max(1,Math.round(pxW*scale)); pxH=Math.max(1,Math.round(pxH*scale));
+    } else if(pxW*pxH>maxPixels) {
+      throw new Error("出力画像が大きすぎます。DPIを下げるか、小さい用紙を選択してください。");
+    }
+    canvas.width=pxW; canvas.height=pxH;
+    const ctx=canvas.getContext("2d",{willReadFrequently:true});
+    ctx.fillStyle="#ffffff";ctx.fillRect(0,0,pxW,pxH);
+    const sx=pxW/w, sy=pxH/h;
+    // 図面座標(mm)を用紙ピクセルへ変換。モデル空間単位はmmを想定。
+    const tr={x:0,y:0,h:h,s:sx};
+    ctx.save(); ctx.beginPath();ctx.rect(0,0,pxW,pxH);ctx.clip();
+    for(const e of (parsed.entities||[])) drawEntity(ctx,e,tr);
+    ctx.restore();
+    return {pxW,pxH,w,h,dpi};
+  }
+  function loadFile(file) {
+    if(!file) return;
+    if(!/\.dxf$/i.test(file.name)) { say("DXFファイルを選択してください。"); return; }
+    if(typeof DxfParser === "undefined") { say("DXF解析ライブラリを読み込めません。インターネット接続を確認してください。"); return; }
+    say(`読み込み中: ${file.name}`);
+    const reader=new FileReader();
+    reader.onerror=()=>say("ファイルを読み込めませんでした。");
+    reader.onload=()=>{
+      try {
+        const parser=new DxfParser();
+        parsed=parser.parseSync(String(reader.result));
+        filename=file.name.replace(/\.dxf$/i,"");
+        $("render").disabled=false;
+        $("download").disabled=false;
+        const count=parsed.entities?.length||0;
+        say(`${file.name} を読み込みました。エンティティ数: ${count}`);
+        updatePreview();
+      } catch(err) {
+        parsed=null;$("render").disabled=true;$("download").disabled=true;
+        say("DXF解析エラー: "+(err.message||err));
+      }
+    };
+    reader.readAsText(file);
+  }
+  function updatePreview() {
+    try {
+      const result=renderToCanvas(preview,Infinity,true);
+      setPreviewMeta(result.w,result.h,Number($("dpi").value));
+      $("download").disabled=false;
+    } catch(err) { say(err.message||String(err)); }
+  }
+  function encodeTiff(canvas) {
+    // Baseline TIFF, little-endian, uncompressed, 8-bit RGB, one strip.
+    const ctx=canvas.getContext("2d",{willReadFrequently:true});
+    const {data}=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const width=canvas.width,height=canvas.height, samples=3;
+    const rgb=new Uint8Array(width*height*samples);
+    for(let s=0,d=0;s<data.length;s+=4){rgb[d++]=data[s];rgb[d++]=data[s+1];rgb[d++]=data[s+2];}
+    const entries=11, ifdOffset=8, ifdSize=2+entries*12+4;
+    const bitsOffset=ifdOffset+ifdSize, xresOffset=bitsOffset+6, yresOffset=xresOffset+8, pixelOffset=yresOffset+8;
+    const total=pixelOffset+rgb.length;
+    const buffer=new ArrayBuffer(total), view=new DataView(buffer), bytes=new Uint8Array(buffer);
+    view.setUint16(0,0x4949,true);view.setUint16(2,42,true);view.setUint32(4,ifdOffset,true);
+    view.setUint16(ifdOffset,entries,true);
+    let o=ifdOffset+2;
+    function tag(id,type,count,value){view.setUint16(o,id,true);view.setUint16(o+2,type,true);view.setUint32(o+4,count,true);view.setUint32(o+8,value,true);o+=12;}
+    tag(256,4,1,width); tag(257,4,1,height); tag(258,3,3,bitsOffset);
+    tag(259,3,1,1); tag(262,3,1,2); tag(273,4,1,pixelOffset);
+    tag(277,3,1,3); tag(278,4,1,height); tag(279,4,1,rgb.length);
+    tag(282,5,1,xresOffset); tag(283,5,1,yresOffset);
+    view.setUint32(o,0,true);
+    view.setUint16(bitsOffset,8,true);view.setUint16(bitsOffset+2,8,true);view.setUint16(bitsOffset+4,8,true);
+    const dpi=Number($("dpi").value);
+    view.setUint32(xresOffset,dpi,true);view.setUint32(xresOffset+4,1,true);
+    view.setUint32(yresOffset,dpi,true);view.setUint32(yresOffset+4,1,true);
+    bytes.set(rgb,pixelOffset);
+    return new Blob([buffer],{type:"image/tiff"});
+  }
+  function download() {
+    if(!parsed)return;
+    try {
+      const {w,h}=paperSize(),dpi=Number($("dpi").value);
+      const out=document.createElement("canvas");
+      const result=renderToCanvas(out,30000000,false);
+      const isTiff=$("format").value==="tiff";
+      const blob=isTiff?encodeTiff(out):null;
+      if(isTiff) saveBlob(blob,`${filename}_${w}x${h}mm_${dpi}dpi.tif`);
+      else out.toBlob(b=>{if(b)saveBlob(b,`${filename}_${w}x${h}mm_${dpi}dpi.png`);},"image/png");
+      say(`出力しました: ${result.pxW} × ${result.pxH} px`);
+    } catch(err) { say("出力エラー: "+(err.message||err)); }
+  }
+  function saveBlob(blob,name) {
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+  drop.addEventListener("click",()=>fileInput.click());
+  drop.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fileInput.click();}});
+  fileInput.addEventListener("change",e=>loadFile(e.target.files[0]));
+  ["dragenter","dragover"].forEach(type=>drop.addEventListener(type,e=>{e.preventDefault();drop.classList.add("over");}));
+  ["dragleave","drop"].forEach(type=>drop.addEventListener(type,e=>{e.preventDefault();drop.classList.remove("over");}));
+  drop.addEventListener("drop",e=>loadFile(e.dataTransfer.files[0]));
+  $("render").addEventListener("click",updatePreview);
+  $("fit").addEventListener("click",updatePreview);
+  $("download").addEventListener("click",download);
+  ["paper","orientation","dpi"].forEach(id=>$(id).addEventListener("change",updatePreview));
+})();
+</script>
+</body>
+</html>
